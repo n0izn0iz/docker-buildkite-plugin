@@ -53,6 +53,10 @@ expand_relative_volume_path() {
     printf "%s" "${PWD}${path#.}"
   elif [[ $path =~ ^\.(/|\\) ]] ; then
     printf "%s" "${PWD}/${path#.}"
+  elif [[ $path =~ ^~: ]] ; then
+    printf "%s" "${HOME}${path#~}"
+  elif [[ $path =~ ^~/ ]] ; then
+    printf "%s" "${HOME}${path#~}"
   else
     echo "$path"
   fi
