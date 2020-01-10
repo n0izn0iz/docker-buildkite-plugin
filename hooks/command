@@ -166,7 +166,9 @@ if plugin_read_list_into_result BUILDKITE_PLUGIN_DOCKER_PUBLISH ; then
 fi
 
 if [[ -n "${BUILDKITE_PLUGIN_DOCKER_PROPAGATE_UID_GID:-}" ]] ; then
-  args+=("-u" "$(id -u):$(id -g)")
+  uid=$(id -u)
+  gid=$(id -g)
+  args+=("-u" "$uid:$gid")
 fi
 
 # Support docker run --group-add
@@ -392,6 +394,32 @@ echo -ne '\033[90m$\033[0m docker run ' >&2
 printf "%q " "${args[@]}"
 echo
 
-# Don't convert paths on gitbash on windows, as that can mangle user paths and cmd options.
-# See https://github.com/buildkite-plugins/docker-buildkite-plugin/issues/81 for more information.
-( if is_windows ; then export MSYS_NO_PATHCONV=1; fi && docker run "${args[@]}" )
+if [[ -n "${BUILDKITE_PLUGIN_DOCKER_PROPAGATE_UID_GID:-}" ]] ; then
+  echo "--- :docker: WARNING: Using experimental /etc/passwd:/etc/group injection"
+
+  container_id=$(docker create "${args[@]}")
+
+  container_passwd=$container_id:/etc/passwd
+  container_group=$container_id:/etc/group
+  tmp_dir=/tmp/docker-buildkite/$BUILDKITE_JOB_ID
+  user_name=buildkite-agent
+  group_name=buildkite-agent
+  user_home=/home/${user_name}
+  tmp_passwd=$tmp_dir/passwd
+  tmp_group=$tmp_dir/group
+
+  docker cp $container_passwd $tmp_passwd
+  docker cp $container_group $tmp_group
+
+  echo ${user_name}:x:${uid}:${gid}::${user_home}:/bin/sh >> $tmp_passwd
+  echo ${group_name}:x:${gid}: >> $tmp_group
+
+  docker cp $tmp_passwd $container_passwd
+  docker cp $tmp_group $container_group
+
+  docker start -a -i $container_id
+else
+  # Don't convert paths on gitbash on windows, as that can mangle user paths and cmd options.
+  # See https://github.com/buildkite-plugins/docker-buildkite-plugin/issues/81 for more information.
+  ( if is_windows ; then export MSYS_NO_PATHCONV=1; fi && docker run "${args[@]}" )
+fi
