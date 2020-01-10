@@ -53,8 +53,8 @@ expand_relative_volume_path() {
     printf "%s" "${PWD}${path#.}"
   elif [[ $path =~ ^\.(/|\\) ]] ; then
     printf "%s" "${PWD}/${path#.}"
-  elif [[ $path =~ ^~/ ]] ; then
-    printf "%s" "${HOME}/${path#.}"
+  elif [[ $path =~ ^~ ]] ; then
+    printf "%s" "${HOME}${path#.}"
   else
     echo "$path"
   fi
@@ -122,9 +122,12 @@ if [[ "${BUILDKITE_PLUGIN_DOCKER_MOUNT_CHECKOUT:-on}" =~ ^(true|on|1)$ ]] ; then
   args+=( "--volume" "${pwd_default}:${workdir}" )
 fi
 
+echo Volumes: $BUILDKITE_PLUGIN_DOCKER_VOLUMES
+
 # Parse volumes (and deprecated mounts) and add them to the docker args
 if plugin_read_list_into_result BUILDKITE_PLUGIN_DOCKER_VOLUMES BUILDKITE_PLUGIN_DOCKER_MOUNTS ; then
   for arg in "${result[@]}" ; do
+    echo Expanding volume $arg
     args+=( "--volume" "$(expand_relative_volume_path "${arg}")" )
   done
 fi
