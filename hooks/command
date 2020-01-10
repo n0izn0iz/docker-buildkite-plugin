@@ -53,8 +53,8 @@ expand_relative_volume_path() {
     printf "%s" "${PWD}${path#.}"
   elif [[ $path =~ ^\.(/|\\) ]] ; then
     printf "%s" "${PWD}/${path#.}"
-  elif [[ $path =~ ^~/ ]] ; then
-    printf "%s" "${HOME}/${path#.}"
+  elif [[ $path =~ ^~ ]] ; then
+    printf "%s" "${HOME}${path#~}"
   else
     echo "$path"
   fi
@@ -395,18 +395,20 @@ printf "%q " "${args[@]}"
 echo
 
 if [[ -n "${BUILDKITE_PLUGIN_DOCKER_PROPAGATE_UID_GID:-}" ]] ; then
-  echo "--- :docker: WARNING: Using experimental /etc/passwd:/etc/group injection"
+  echo "WARNING: Using experimental /etc/passwd:/etc/group injection"
 
   container_id=$(docker create "${args[@]}")
 
   container_passwd=$container_id:/etc/passwd
   container_group=$container_id:/etc/group
-  tmp_dir=/tmp/docker-buildkite/$BUILDKITE_JOB_ID
+  tmp_dir=/tmp/docker-buildkite-plugin/$BUILDKITE_JOB_ID
   user_name=buildkite-agent
   group_name=buildkite-agent
   user_home=/home/${user_name}
   tmp_passwd=$tmp_dir/passwd
   tmp_group=$tmp_dir/group
+
+  mkdir -p $tmp_dir
 
   docker cp $container_passwd $tmp_passwd
   docker cp $container_group $tmp_group
@@ -416,6 +418,8 @@ if [[ -n "${BUILDKITE_PLUGIN_DOCKER_PROPAGATE_UID_GID:-}" ]] ; then
 
   docker cp $tmp_passwd $container_passwd
   docker cp $tmp_group $container_group
+
+  rm $tmp_passwd $tmp_group
 
   docker start -a -i $container_id
 else
